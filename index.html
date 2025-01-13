@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Random Location on Land</title>
+    <title>Random Land Location</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <style>
         #map {
@@ -23,6 +23,7 @@
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
     <script>
         // Initialisiere die Karte
         const map = L.map('map').setView([0, 0], 2);
@@ -33,20 +34,32 @@
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        // Marker für den zufälligen Ort
+        // GeoJSON-Datei URL (aus deinem Repository)
+        const geojsonUrl = 'https://raw.githubusercontent.com/thetaproot/routebound/main/countries.geojson';
+
+        let geojsonData;
         let marker;
 
-        // Funktion, um zufällige Koordinaten auf Land zu finden
+        // Funktion: Hole zufällige Landkoordinaten
         async function getRandomLandLocation() {
-            const response = await fetch('https://api.onwater.io/api/v1/random?access_token=YOUR_ACCESS_TOKEN');
-            const data = await response.json();
-
-            if (data.found && !data.water) {
-                return [data.lat, data.lng];
-            } else {
-                // Rekursiver Aufruf, falls Punkt auf Wasser
-                return getRandomLandLocation();
+            if (!geojsonData) {
+                // Lade GeoJSON-Daten nur einmal
+                const response = await fetch(geojsonUrl);
+                geojsonData = await response.json();
             }
+
+            let point, isOnLand;
+            do {
+                // Generiere einen zufälligen Punkt
+                point = turf.randomPoint(1).features[0];
+
+                // Prüfe, ob der Punkt auf Land liegt
+                isOnLand = geojsonData.features.some(feature =>
+                    turf.booleanPointInPolygon(point, feature)
+                );
+            } while (!isOnLand); // Wiederhole, bis ein Punkt auf Land gefunden wird
+
+            return point.geometry.coordinates.reverse(); // [lat, lng]
         }
 
         // Button-Klick-Handler
@@ -59,7 +72,7 @@
                 marker = L.marker([lat, lng]).addTo(map);
                 map.setView([lat, lng], 8);
             } catch (error) {
-                console.error('Error fetching random location:', error);
+                console.error('Error finding random location:', error);
                 alert('Could not find a random location. Try again.');
             }
         });
