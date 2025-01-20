@@ -20,8 +20,10 @@
             font-size: 1.2em;
             margin: 10px;
         }
-        button {
+        body, button, #info {
             font-family: 'Josefin Slab', serif;
+        }
+        button {
             font-size: 1rem;
             padding: 10px 20px;
             margin: 5px;
@@ -46,13 +48,11 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
     <script>
-        // Initialisiere die Karte
-        const map = L.map('map').setView([0, 0], 2);
+        const map = L.map('map').setView([0, 0], 6);
 
-        // Layer für Straßenkarte (mit POIs) und Satellitenansicht
-        const streetMap = L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', {
-            maxZoom: 20,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles courtesy of <a href="https://openstreetmap.fr/">OSM France</a>'
+        const streetMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         });
 
         const satelliteMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -60,83 +60,64 @@
             attribution: 'Tiles © Esri, DigitalGlobe, GeoEye, Earthstar Geographics'
         });
 
-        const poiLayer = L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', {
-            maxZoom: 20,
-            opacity: 0.7,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles courtesy of <a href="https://openstreetmap.fr/">OSM France</a>'
-        });
-
-        // Standard-Kartenlayer hinzufügen
         streetMap.addTo(map);
 
-        // GeoJSON-Datei URL (aus deinem Repository)
         const geojsonUrl = 'https://raw.githubusercontent.com/thetaproot/routebound/main/countries.geojson';
 
         let geojsonData;
         let marker;
         let currentLayer = streetMap;
 
-        // Funktion: Hole zufällige Landkoordinaten
         async function getRandomLandLocation() {
             if (!geojsonData) {
-                // Lade GeoJSON-Daten nur einmal
                 const response = await fetch(geojsonUrl);
                 geojsonData = await response.json();
             }
 
             let point, isOnLand;
             do {
-                // Generiere einen zufälligen Punkt
                 point = turf.randomPoint(1).features[0];
-
-                // Prüfe, ob der Punkt auf Land liegt
                 isOnLand = geojsonData.features.some(feature =>
                     turf.booleanPointInPolygon(point, feature)
                 );
-            } while (!isOnLand); // Wiederhole, bis ein Punkt auf Land gefunden wird
-
-            return point.geometry.coordinates.reverse(); // [lat, lng]
+            } while (!isOnLand);
+            return point.geometry.coordinates.reverse();
         }
 
-        // Button-Klick-Handler: Zufällige Landkoordinaten anzeigen
+        async function getLocationDetails(lat, lng) {
+            const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Failed to fetch location details');
+            return await response.json();
+        }
+
         document.getElementById('randomLocationButton').addEventListener('click', async () => {
             try {
                 const [lat, lng] = await getRandomLandLocation();
 
-                // Lösche vorherige Marker
-                if (marker) {
-                    map.removeLayer(marker);
-                }
-
-                // Marker hinzufügen und Karte zentrieren
+                if (marker) map.removeLayer(marker);
                 marker = L.marker([lat, lng]).addTo(map);
                 map.setView([lat, lng], 8);
 
-                // Land aus GeoJSON extrahieren
                 const country = geojsonData.features.find(feature =>
                     turf.booleanPointInPolygon(turf.point([lng, lat]), feature)
                 )?.properties.ADMIN || 'Unknown Country';
 
-                // Koordinaten und Land anzeigen
-                document.getElementById('info').innerText = `Coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)} | Country: ${country}`;
+                const locationDetails = await getLocationDetails(lat, lng);
+                const city = locationDetails.address.city || locationDetails.address.town || locationDetails.address.village || 'Unknown City';
+                const region = locationDetails.address.state || 'Unknown Region';
+
+                document.getElementById('info').innerText = `Coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)} | City: ${city} | Region: ${region} | Country: ${country}`;
             } catch (error) {
-                console.error('Error finding random location:', error);
+                console.error(error);
                 alert('Could not find a random location. Try again.');
             }
         });
 
-        // Button-Klick-Handler: Satellitenansicht umschalten
         document.getElementById('toggleSatellite').addEventListener('click', () => {
             map.removeLayer(currentLayer);
             currentLayer = currentLayer === streetMap ? satelliteMap : streetMap;
             currentLayer.addTo(map);
-
-            // POIs hinzufügen, wenn im Satellitenmodus
-            if (currentLayer === satelliteMap) {
-                map.addLayer(poiLayer);
-            } else {
-                map.removeLayer(poiLayer);
-            }
         });
     </script>
 </body>
