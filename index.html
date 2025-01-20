@@ -3,122 +3,135 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Random Land Location</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-    <link href="https://fonts.googleapis.com/css2?family=Josefin+Slab:wght@400;700&display=swap" rel="stylesheet">
+    <title>Random Land Location App</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
     <style>
+        body {
+            font-family: "Josefin Slab", serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
         #map {
-            height: 80vh;
-            width: 100%;
-        }
-        #button-container {
-            text-align: center;
-            margin: 10px;
-        }
-        #info {
-            text-align: center;
-            font-size: 1.2em;
-            margin: 10px;
-        }
-        body, button, #info {
-            font-family: 'Josefin Slab', serif;
+            width: 80%;
+            height: 500px;
+            margin-top: 20px;
         }
         button {
-            font-size: 1rem;
+            font-family: "Josefin Slab", serif;
+            font-size: 18px;
             padding: 10px 20px;
-            margin: 5px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
+            margin: 10px;
             cursor: pointer;
-            background-color: #f8f9fa;
         }
-        button:hover {
-            background-color: #e2e6ea;
+        #info {
+            margin-top: 20px;
+            font-size: 18px;
         }
     </style>
+    <link href="https://fonts.googleapis.com/css2?family=Josefin+Slab:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div id="button-container">
-        <button id="randomLocationButton">Show Random Land Location</button>
-        <button id="toggleSatellite">Toggle Satellite View</button>
-    </div>
+    <h1>Random Land Location Finder</h1>
+    <button id="randomLocationButton">Show Random Land Location</button>
     <div id="info"></div>
     <div id="map"></div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
     <script>
-        const map = L.map('map').setView([0, 0], 6);
+        // GeoJSON URL
+        const geojsonUrl = "https://raw.githubusercontent.com/datasets/geo-boundaries-world-110m/master/countries.geojson";
 
-        const streetMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        // Initialize Map
+        const map = L.map('map').setView([20, 0], 2);
+
+        // Base Layers
+        const defaultLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        const satelliteLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenTopoMap contributors'
         });
 
-        const satelliteMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            maxZoom: 20,
-            attribution: 'Tiles © Esri, DigitalGlobe, GeoEye, Earthstar Geographics'
+        // Overlay for POIs
+        const poiOverlay = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
         });
 
-        streetMap.addTo(map);
+        // Layer Control
+        const baseMaps = {
+            "Default": defaultLayer,
+            "Satellite": satelliteLayer
+        };
 
-        const geojsonUrl = 'https://raw.githubusercontent.com/thetaproot/routebound/main/countries.geojson';
+        const overlayMaps = {
+            "Points of Interest": poiOverlay
+        };
 
+        L.control.layers(baseMaps, overlayMaps).addTo(map);
+
+        // Global variables
         let geojsonData;
         let marker;
-        let currentLayer = streetMap;
 
-        async function getRandomLandLocation() {
+        // Load GeoJSON data
+        async function loadGeoJSON() {
+            const response = await fetch(geojsonUrl);
+            geojsonData = await response.json();
+        }
+
+        // Generate a random land location
+        async function getRandomLandLocation(maxAttempts = 2000) {
             if (!geojsonData) {
                 const response = await fetch(geojsonUrl);
                 geojsonData = await response.json();
             }
 
             let point, isOnLand;
-            do {
+            for (let attempt = 0; attempt < maxAttempts; attempt++) {
                 point = turf.randomPoint(1).features[0];
                 isOnLand = geojsonData.features.some(feature =>
                     turf.booleanPointInPolygon(point, feature)
                 );
-            } while (!isOnLand);
-            return point.geometry.coordinates.reverse();
-        }
-
-        async function getLocationDetails(lat, lng) {
-            const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`;
-            const response = await fetch(url);
-            if (!response.ok) throw new Error('Failed to fetch location details');
-            return await response.json();
-        }
-
-        document.getElementById('randomLocationButton').addEventListener('click', async () => {
-            try {
-                const [lat, lng] = await getRandomLandLocation();
-
-                if (marker) map.removeLayer(marker);
-                marker = L.marker([lat, lng]).addTo(map);
-                map.setView([lat, lng], 8);
-
-                const country = geojsonData.features.find(feature =>
-                    turf.booleanPointInPolygon(turf.point([lng, lat]), feature)
-                )?.properties.ADMIN || 'Unknown Country';
-
-                const locationDetails = await getLocationDetails(lat, lng);
-                const city = locationDetails.address.city || locationDetails.address.town || locationDetails.address.village || 'Unknown City';
-                const region = locationDetails.address.state || 'Unknown Region';
-
-                document.getElementById('info').innerText = `Coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)} | City: ${city} | Region: ${region} | Country: ${country}`;
-            } catch (error) {
-                console.error(error);
-                alert('Could not find a random location. Try again.');
+                if (isOnLand) {
+                    return point.geometry.coordinates.reverse(); // [lat, lng]
+                }
             }
-        });
+            throw new Error('Could not find a random land location after many attempts');
+        }
 
-        document.getElementById('toggleSatellite').addEventListener('click', () => {
-            map.removeLayer(currentLayer);
-            currentLayer = currentLayer === streetMap ? satelliteMap : streetMap;
-            currentLayer.addTo(map);
-        });
+        // Display the random location
+        async function showRandomLocation() {
+            const infoDiv = document.getElementById('info');
+            try {
+                const coordinates = await getRandomLandLocation();
+                const lat = coordinates[0].toFixed(6);
+                const lng = coordinates[1].toFixed(6);
+
+                // Update map
+                if (marker) {
+                    map.removeLayer(marker);
+                }
+                marker = L.marker(coordinates).addTo(map);
+                map.setView(coordinates, 8);
+
+                // Display coordinates
+                infoDiv.innerHTML = `Coordinates: ${lat}, ${lng}`;
+            } catch (error) {
+                infoDiv.innerHTML = 'Could not find a random location. Try again.';
+                console.error(error);
+            }
+        }
+
+        // Event listener for the button
+        document.getElementById('randomLocationButton').addEventListener('click', showRandomLocation);
+
+        // Load GeoJSON data when the page loads
+        loadGeoJSON();
     </script>
 </body>
 </html>
