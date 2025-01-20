@@ -110,7 +110,7 @@
                 document.getElementById('info').innerText = `Coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)} | City: ${city} | Region: ${region} | Country: ${country}`;
             } catch (error) {
                 console.error(error);
-                alert('you're not ready to leave just yet. try again');
+                alert('Could not find a random location. Try again.');
             }
         });
 
