@@ -39,8 +39,8 @@
 </head>
 <body>
     <div id="button-container">
-        <button id="randomLocationButton">Show Random Land Location</button>
-        <button id="toggleSatellite">Toggle Satellite View</button>
+        <button id="randomLocationButton">next routepoint</button>
+        <button id="toggleSatellite">map / satellite</button>
     </div>
     <div id="info"></div>
     <div id="map"></div>
@@ -110,7 +110,7 @@
                 document.getElementById('info').innerText = `Coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)} | City: ${city} | Region: ${region} | Country: ${country}`;
             } catch (error) {
                 console.error(error);
-                alert('Could not find a random location. Try again.');
+                alert('you're not ready to leave just yet. try again');
             }
         });
 
