@@ -14,12 +14,19 @@
             text-align: center;
             margin: 10px;
         }
+        #info {
+            text-align: center;
+            font-size: 1.2em;
+            margin: 10px;
+        }
     </style>
 </head>
 <body>
     <div id="button-container">
-        <button id="randomLocationButton">Next Routepoint</button>
+        <button id="randomLocationButton">Show Random Land Location</button>
+        <button id="toggleSatellite">Toggle Satellite View</button>
     </div>
+    <div id="info"></div>
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -28,17 +35,26 @@
         // Initialisiere die Karte
         const map = L.map('map').setView([0, 0], 2);
 
-        // Füge die OSM-Kartenkacheln hinzu
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
+        // Layer für Straßenkarte (mit POIs) und Satellitenansicht
+        const streetMap = L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', {
+            maxZoom: 20,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles courtesy of <a href="https://openstreetmap.fr/">OSM France</a>'
+        });
+
+        const satelliteMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 20,
+            attribution: 'Tiles © Esri, DigitalGlobe, GeoEye, Earthstar Geographics'
+        });
+
+        // Standard-Kartenlayer hinzufügen
+        streetMap.addTo(map);
 
         // GeoJSON-Datei URL (aus deinem Repository)
         const geojsonUrl = 'https://raw.githubusercontent.com/thetaproot/routebound/main/countries.geojson';
 
         let geojsonData;
         let marker;
+        let currentLayer = streetMap;
 
         // Funktion: Hole zufällige Landkoordinaten
         async function getRandomLandLocation() {
@@ -62,19 +78,38 @@
             return point.geometry.coordinates.reverse(); // [lat, lng]
         }
 
-        // Button-Klick-Handler
+        // Button-Klick-Handler: Zufällige Landkoordinaten anzeigen
         document.getElementById('randomLocationButton').addEventListener('click', async () => {
             try {
                 const [lat, lng] = await getRandomLandLocation();
+
+                // Lösche vorherige Marker
                 if (marker) {
                     map.removeLayer(marker);
                 }
+
+                // Marker hinzufügen und Karte zentrieren
                 marker = L.marker([lat, lng]).addTo(map);
                 map.setView([lat, lng], 8);
+
+                // Land aus GeoJSON extrahieren
+                const country = geojsonData.features.find(feature =>
+                    turf.booleanPointInPolygon(turf.point([lng, lat]), feature)
+                )?.properties.ADMIN || 'Unknown Country';
+
+                // Koordinaten und Land anzeigen
+                document.getElementById('info').innerText = `Coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)} | Country: ${country}`;
             } catch (error) {
                 console.error('Error finding random location:', error);
                 alert('Could not find a random location. Try again.');
             }
+        });
+
+        // Button-Klick-Handler: Satellitenansicht umschalten
+        document.getElementById('toggleSatellite').addEventListener('click', () => {
+            map.removeLayer(currentLayer);
+            currentLayer = currentLayer === streetMap ? satelliteMap : streetMap;
+            currentLayer.addTo(map);
         });
     </script>
 </body>
