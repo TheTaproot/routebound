@@ -53,8 +53,9 @@
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
-        const satelliteLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenTopoMap contributors'
+        const satelliteLayer = L.tileLayer('https://{s}.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles © Esri',
+            subdomains: ['server', 'services']
         });
 
         // Overlay for POIs
@@ -82,6 +83,14 @@
         async function loadGeoJSON() {
             const response = await fetch(geojsonUrl);
             geojsonData = await response.json();
+        }
+
+        // Reverse Geocoding to get Land, Region, and City
+        async function reverseGeocode(lat, lng) {
+            const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`;
+            const response = await fetch(url);
+            const data = await response.json();
+            return data;
         }
 
         // Generate a random land location
@@ -112,6 +121,12 @@
                 const lat = coordinates[0].toFixed(6);
                 const lng = coordinates[1].toFixed(6);
 
+                // Reverse Geocode to get Land, Region, City
+                const locationData = await reverseGeocode(lat, lng);
+
+                const country = locationData.address.country || "Unknown country";
+                const city = locationData.address.city || locationData.address.town || locationData.address.village || "Unknown city/region";
+
                 // Update map
                 if (marker) {
                     map.removeLayer(marker);
@@ -119,8 +134,8 @@
                 marker = L.marker(coordinates).addTo(map);
                 map.setView(coordinates, 8);
 
-                // Display coordinates
-                infoDiv.innerHTML = `Coordinates: ${lat}, ${lng}`;
+                // Display coordinates and location info
+                infoDiv.innerHTML = `Coordinates: ${lat}, ${lng}<br>Country: ${country}<br>City/Region: ${city}`;
             } catch (error) {
                 infoDiv.innerHTML = 'Could not find a random location. Try again.';
                 console.error(error);
