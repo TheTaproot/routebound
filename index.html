@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Random Land Location</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link href="https://fonts.googleapis.com/css2?family=Josefin+Slab:wght@400;700&display=swap" rel="stylesheet">
     <style>
         #map {
             height: 80vh;
@@ -18,6 +19,19 @@
             text-align: center;
             font-size: 1.2em;
             margin: 10px;
+        }
+        button {
+            font-family: 'Josefin Slab', serif;
+            font-size: 1rem;
+            padding: 10px 20px;
+            margin: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: #f8f9fa;
+        }
+        button:hover {
+            background-color: #e2e6ea;
         }
     </style>
 </head>
@@ -44,6 +58,12 @@
         const satelliteMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 20,
             attribution: 'Tiles © Esri, DigitalGlobe, GeoEye, Earthstar Geographics'
+        });
+
+        const poiLayer = L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', {
+            maxZoom: 20,
+            opacity: 0.7,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles courtesy of <a href="https://openstreetmap.fr/">OSM France</a>'
         });
 
         // Standard-Kartenlayer hinzufügen
@@ -110,6 +130,13 @@
             map.removeLayer(currentLayer);
             currentLayer = currentLayer === streetMap ? satelliteMap : streetMap;
             currentLayer.addTo(map);
+
+            // POIs hinzufügen, wenn im Satellitenmodus
+            if (currentLayer === satelliteMap) {
+                map.addLayer(poiLayer);
+            } else {
+                map.removeLayer(poiLayer);
+            }
         });
     </script>
 </body>
