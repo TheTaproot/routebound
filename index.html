@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>routebound</title>
+    <title>route.bound</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link href="https://fonts.googleapis.com/css2?family=Josefin+Slab:wght@400;700&display=swap" rel="stylesheet">
     <style>
@@ -68,20 +68,29 @@
         let marker;
         let currentLayer = streetMap;
 
+        function getRandomCountry() {
+            const randomIndex = Math.floor(Math.random() * geojsonData.features.length);
+            return geojsonData.features[randomIndex];
+        }
+
+        function getRandomPointInCountry(countryFeature) {
+            const bbox = turf.bbox(countryFeature);
+            let point, isOnLand;
+            do {
+                point = turf.randomPoint(1, { bbox }).features[0];
+                isOnLand = turf.booleanPointInPolygon(point, countryFeature);
+            } while (!isOnLand);
+            return point.geometry.coordinates.reverse();
+        }
+
         async function getRandomLandLocation() {
             if (!geojsonData) {
                 const response = await fetch(geojsonUrl);
                 geojsonData = await response.json();
             }
 
-            let point, isOnLand;
-            do {
-                point = turf.randomPoint(1).features[0];
-                isOnLand = geojsonData.features.some(feature =>
-                    turf.booleanPointInPolygon(point, feature)
-                );
-            } while (!isOnLand);
-            return point.geometry.coordinates.reverse();
+            const randomCountry = getRandomCountry();
+            return getRandomPointInCountry(randomCountry);
         }
 
         async function getLocationDetails(lat, lng) {
@@ -99,13 +108,10 @@
                 marker = L.marker([lat, lng]).addTo(map);
                 map.setView([lat, lng], 8);
 
-                const country = geojsonData.features.find(feature =>
-                    turf.booleanPointInPolygon(turf.point([lng, lat]), feature)
-                )?.properties.ADMIN || 'Unknown Country';
-
                 const locationDetails = await getLocationDetails(lat, lng);
                 const city = locationDetails.address.city || locationDetails.address.town || locationDetails.address.village || 'Unknown City';
                 const region = locationDetails.address.state || 'Unknown Region';
+                const country = locationDetails.address.country || 'Unknown Country';
 
                 document.getElementById('info').innerText = `Coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)} | City: ${city} | Region: ${region} | Country: ${country}`;
             } catch (error) {
